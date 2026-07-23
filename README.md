@@ -1,40 +1,73 @@
-# Local Issues Survey Requirements
+# Local Issues Survey
 
-## 2.1 Topics
-- The app shall display all 6 local topics on the main page simultaneously.
-- Each topic shall be presented as a clickable element (e.g., card or row).
-- Given a user clicks a topic, then a dropdown/expandable panel opens showing its associated questions.
-- **Accordion behavior**: Only one topic dropdown may be open at a time. Given a user clicks a topic while a different topic's dropdown is open, the previously open dropdown shall close and the newly selected topic's dropdown shall open.
-- Given a user clicks the currently open topic again, the dropdown shall collapse.
+A community survey app where residents can browse local issue topics, submit questions, and upvote what matters most. Built with Next.js 15, Tailwind CSS v4, and Neon serverless Postgres, deployed on Cloudflare Pages.
 
-## 2.2 Questions
-- Within each topic's dropdown, all previously added questions shall be listed.
-- **Primary sort**: Questions shall be sorted by vote count in descending order (most votes to least votes).
-- **Secondary sort (tiebreaker)**: Given two or more questions have equal vote counts, they shall be sorted by date added, most recent first (*confirm: most recent first, or oldest first? — assumed most recent first; flag if reversed*).
-- **Sort timing**: The list shall re-sort on page refresh or when the topic dropdown is reopened — not live/real-time. A user's own vote will not visibly reorder the list until they refresh or re-open the dropdown.
-- Given a topic has no questions yet, the dropdown shall display an empty state with the "Add a question" button still available.
+## Features
 
-## 2.3 Adding Questions
-- An "Add a question" button/input shall appear at the top of each topic's dropdown, above the list of existing questions.
-- Given a user activates this button without a stored email, they shall be routed through the email gate (2.5) before the question is accepted.
-- Given a user submits a valid question, it shall appear in the dropdown's question list at next refresh/reopen, sorted per 2.2 (new questions start at 0 votes, positioned per the date-added tiebreaker among other 0-vote questions).
+- 6 topic categories with accordion-style expand/collapse
+- Submit questions under any topic (requires email, stored locally)
+- Upvote questions — one vote per email per question
+- Questions sorted by votes, re-sorted on each reopen
+- Works fully in-memory with no database configuration required
 
-## 2.4 Voting
-- Each question row within the dropdown shall display a voting control positioned to the left of the question text.
-- Given a user activates the voting control without a stored email, they shall be routed through the email gate before the vote is recorded.
-- Given a user has already voted on a question, the voting control shall reflect their vote state (e.g., filled/highlighted icon, disabled from re-voting).
-- Given a user votes on a question, the vote count shall increment immediately (optimistic UI update on the count itself), but list re-sorting shall only occur on refresh/reopen per 2.2.
-- Voting is per-question; a user may vote on multiple questions within the same topic and across different topics.
+## Running locally
 
-## 2.5 Email Gate
-- Users must enter a valid email before voting or adding a question.
-- One email = one identity; no additional verification required.
-- Once provided in a session, the email shall not be re-requested for subsequent actions in that session.
+```bash
+# Install dependencies
+pnpm install
 
-## 2.6 Web Experience 
-- Application is compatible with desktop browser (Chrome, Safari, Firefox, Edge — latest 2 versions), and all features function and display correctly.
-- Application is compatbile with mobile browser (iOS Safari, Android Chrome)
+# Start dev server (uses in-memory store — no DB needed)
+pnpm dev
+```
 
-## Example UI mockup:
+Open [http://localhost:3000](http://localhost:3000).
 
-<img width="723" height="668" alt="image" src="https://github.com/user-attachments/assets/72168ff7-99e9-48ac-a435-36e84308181d" />
+### Using a real database
+
+Add your Neon connection string to `.env.local`:
+
+```
+DATABASE_URL=postgres://user:pass@host/dbname?sslmode=require
+```
+
+Then run the schema against your Neon database:
+
+```sql
+CREATE TABLE topics (
+  id          SERIAL PRIMARY KEY,
+  name        TEXT NOT NULL,
+  emoji       TEXT,
+  description TEXT
+);
+
+CREATE TABLE questions (
+  id           SERIAL PRIMARY KEY,
+  topic_id     INTEGER NOT NULL REFERENCES topics(id),
+  text         TEXT NOT NULL,
+  author_email TEXT NOT NULL,
+  votes        INTEGER NOT NULL DEFAULT 0,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE votes (
+  id          SERIAL PRIMARY KEY,
+  question_id INTEGER NOT NULL REFERENCES questions(id),
+  voter_email TEXT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (question_id, voter_email)
+);
+```
+
+Seed the default topics:
+
+```sql
+INSERT INTO topics (name, emoji, description) VALUES
+  ('Roads & Infrastructure', '🛣️', 'Potholes, sidewalks, bridges, street lighting, and public transit.'),
+  ('Parks & Recreation',     '🌳', 'Parks, playgrounds, sports facilities, trails, and community events.'),
+  ('Public Safety',          '🚨', 'Police, fire, emergency services, traffic safety, and neighborhood watch.'),
+  ('Schools & Education',    '🎓', 'Public schools, libraries, after-school programs, and adult education.'),
+  ('Housing & Development',  '🏘️', 'Affordable housing, zoning, construction projects, and permits.'),
+  ('Environment & Sustainability', '♻️', 'Recycling, green spaces, air and water quality, and climate initiatives.');
+```
+
+See [REQUIREMENTS.md](./REQUIREMENTS.md) for full feature requirements and [spec.md](./spec.md) for implementation spec.
