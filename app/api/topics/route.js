@@ -1,6 +1,5 @@
 import { neon } from "@neondatabase/serverless";
 import { NextResponse } from "next/server";
-import { memGetTopics } from "@/lib/store";
 
 export const runtime = "edge";
 
@@ -8,6 +7,7 @@ export async function GET() {
   const url = process.env.DATABASE_URL;
 
   if (!url) {
+    const { memGetTopics } = await import("@/lib/store");
     return NextResponse.json(memGetTopics());
   }
 

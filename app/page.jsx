@@ -38,20 +38,25 @@ export default function HomePage() {
       .catch((err) => setTopicsError(err.message || "Failed to load topics."));
   }, []);
 
+  // Keep a ref to email so requestEmail always sees the latest value
+  // without needing to re-create the function (avoids stale closure in async handlers)
+  const emailRef = useRef(email);
+  useEffect(() => { emailRef.current = email; }, [email]);
+
   /**
    * Opens the EmailGate and returns a Promise that resolves with the
    * email string once the user confirms, or rejects if they cancel.
    * If we already have an email, resolves immediately.
    */
   const requestEmail = useCallback(() => {
-    if (email) return Promise.resolve(email);
+    if (emailRef.current) return Promise.resolve(emailRef.current);
 
     return new Promise((resolve, reject) => {
       gateResolveRef.current = resolve;
       gateRejectRef.current = reject;
       setGateOpen(true);
     });
-  }, [email]);
+  }, []); // stable — never needs to change
 
   function handleGateConfirm(confirmedEmail) {
     try {

@@ -1,6 +1,5 @@
 import { neon } from "@neondatabase/serverless";
 import { NextResponse } from "next/server";
-import { memVote } from "@/lib/store";
 
 export const runtime = "edge";
 
@@ -30,6 +29,7 @@ export async function POST(req, { params }) {
   const url = process.env.DATABASE_URL;
 
   if (!url) {
+    const { memVote } = await import("@/lib/store");
     const result = memVote(questionId, email);
     if (result.notFound) {
       return NextResponse.json({ error: "Question not found" }, { status: 404 });
@@ -42,24 +42,17 @@ export async function POST(req, { params }) {
 
   const db = neon(url);
 
-  // Check question exists
-  const [question] = await db`SELECT id, votes FROM questions WHERE id = ${questionId}`;
-  if (!question) {
-    return NextResponse.json({ error: "Question not found" }, { status: 404 });
-  }
+  // Insert vote, ignoring duplicate (ON CONFLICT DO NOTHING)
+  const [inserted] = await db`
+    INSERT INTO votes (question_id, voter_email)
+    VALUES (${questionId}, ${email})
+    ON CONFLICT (question_id, voter_email) DO NOTHING
+    RETURNING id
+  `;
 
-  // Insert vote — unique constraint handles duplicates
-  try {
-    await db`
-      INSERT INTO votes (question_id, voter_email)
-      VALUES (${questionId}, ${email})
-    `;
-  } catch (err) {
-    // Unique constraint violation (23505 = unique_violation in Postgres)
-    if (err?.code === "23505") {
-      return NextResponse.json({ error: "Already voted" }, { status: 409 });
-    }
-    throw err;
+  if (!inserted) {
+    // Row already existed — duplicate vote
+    return NextResponse.json({ error: "Already voted" }, { status: 409 });
   }
 
   // Increment denormalized count and return new value
@@ -69,5 +62,10 @@ export async function POST(req, { params }) {
     WHERE id = ${questionId}
     RETURNING votes
   `;
+
+  if (!updated) {
+    return NextResponse.json({ error: "Question not found" }, { status: 404 });
+  }
+
   return NextResponse.json({ votes: updated.votes });
 }

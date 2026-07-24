@@ -1,6 +1,5 @@
 import { neon } from "@neondatabase/serverless";
 import { NextResponse } from "next/server";
-import { memGetQuestions, memAddQuestion } from "@/lib/store";
 
 export const runtime = "edge";
 
@@ -20,6 +19,7 @@ export async function GET(req, { params }) {
   const url = process.env.DATABASE_URL;
 
   if (!url) {
+    const { memGetQuestions } = await import("@/lib/store");
     return NextResponse.json(memGetQuestions(topicId, email));
   }
 
@@ -36,8 +36,8 @@ export async function GET(req, { params }) {
         ? db`EXISTS(
             SELECT 1 FROM votes v
             WHERE v.question_id = q.id AND v.voter_email = ${email}
-          )`
-        : db`false`
+          )::boolean`
+        : db`false::boolean`
       } AS user_voted
     FROM questions q
     WHERE q.topic_id = ${topicId}
@@ -75,6 +75,7 @@ export async function POST(req, { params }) {
   const url = process.env.DATABASE_URL;
 
   if (!url) {
+    const { memAddQuestion } = await import("@/lib/store");
     const question = memAddQuestion(topicId, text.trim(), email);
     return NextResponse.json(question, { status: 201 });
   }

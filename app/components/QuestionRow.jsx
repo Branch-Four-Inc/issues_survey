@@ -34,7 +34,7 @@ export default function QuestionRow({
   const [error, setError] = useState(null);
 
   async function handleVote() {
-    if (question.user_voted || voting) return;
+    if (question.user_voted === true || voting) return;
     setError(null);
 
     let voterEmail = email;
@@ -76,7 +76,7 @@ export default function QuestionRow({
     }
   }
 
-  const voted = question.user_voted;
+  const voted = question.user_voted === true;
 
   return (
     <div className="flex items-start gap-3 py-2">
